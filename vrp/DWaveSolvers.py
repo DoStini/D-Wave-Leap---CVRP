@@ -8,14 +8,18 @@ import dimod
 import neal
 
 # Creates hybrid solver.
+
+
 def hybrid_solver():
     workflow = hybrid.Loop(
         hybrid.RacingBranches(
-        hybrid.InterruptableTabuSampler(),
-        hybrid.EnergyImpactDecomposer(size=30, rolling=True, rolling_history=0.75)
-        | hybrid.QPUSubproblemAutoEmbeddingSampler()
-        | hybrid.SplatComposer()) | hybrid.ArgMin(), convergence=1)
+            hybrid.InterruptableTabuSampler(),
+            hybrid.EnergyImpactDecomposer(
+                size=30, rolling=True, rolling_history=0.75)
+            | hybrid.QPUSubproblemAutoEmbeddingSampler()
+            | hybrid.SplatComposer()) | hybrid.ArgMin(), convergence=1)
     return hybrid.HybridSampler(workflow)
+
 
 def get_solver(solver_type):
     solver = None
@@ -32,19 +36,21 @@ def get_solver(solver_type):
     return solver
 
 # Solves qubo on qpu.
-def solve_qubo(qubo, solver_type = 'qbsolv', limit = 1, num_reads = 50):
+
+
+def solve_qubo(qubo, solver_type='qbsolv', limit=1, num_reads=50):
     sampler = get_solver(solver_type)
 
     response = None
     if solver_type == 'hybrid':
         response = sampler.sample_qubo(qubo.dict)
     elif solver_type == 'qbsolv':
-        response = sampler.sample_qubo(qubo.dict, num_reads = num_reads)
+        response = sampler.sample_qubo(qubo.dict, num_reads=num_reads)
     elif solver_type == 'standard':
-        response = QBSolv().sample_qubo(qubo.dict, solver = sampler, chain_strength = 800, num_reads = num_reads)
+        response = QBSolv().sample_qubo(qubo.dict, solver=sampler,
+                                        chain_strength=800, num_reads=num_reads)
     elif solver_type == 'exact':
         response = sampler.sample_qubo(qubo.dict)
     else:
-        response = sampler.sample_qubo(qubo.dict, num_reads = num_reads)
+        response = sampler.sample_qubo(qubo.dict, num_reads=num_reads)
     return list(response)[:limit]
-    

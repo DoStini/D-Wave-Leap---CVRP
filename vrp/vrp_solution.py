@@ -1,7 +1,7 @@
 class VRPSolution:
-    def __init__(self, problem, sample, vehicle_limits, solution = None):
+    def __init__(self, problem, sample, vehicle_limits, solution=None):
         self.problem = problem
-        
+
         if solution != None:
             self.solution = solution
         else:
@@ -27,12 +27,15 @@ class VRPSolution:
             # Adding first and last magazine.
             for l in result:
                 if len(l) != 0:
-                    if problem.first_source:
+                    if problem.first_source.size:
                         l.insert(0, problem.in_nearest_sources[l[0]])
                     if problem.last_source:
                         l.append(problem.out_nearest_sources[l[len(l) - 1]])
 
             self.solution = result
+            human_nodes = self.problem.relevant_nodes
+            self.human_solution = [[human_nodes[x]
+                                    for x in vehicle] for vehicle in result]
 
     # Checks capacity and visiting.
     def check(self):
@@ -46,11 +49,12 @@ class VRPSolution:
             for dest in vehicle_dests:
                 cap -= weights[dest]
             vehicle_num += 1
-            if cap < 0: 
+            if cap < 0:
                 return False
 
         dests = self.problem.dests
-        answer_dests = [dest for vehicle_dests in solution for dest in vehicle_dests[1:-1]]
+        answer_dests = [
+            dest for vehicle_dests in solution for dest in vehicle_dests[1:-1]]
         if len(dests) != len(answer_dests):
             return False
 
@@ -131,7 +135,8 @@ class VRPSolution:
             for dest in vehicle_dests[1:len(vehicle_dests) - 1]:
                 cost += costs[prev][dest]
                 time += time_costs[prev][dest]
-                print('    Destination number ', dests_num, ' : ', dest, ', reached at time ', time, '.')
+                print('    Destination number ', dests_num, ' : ',
+                      dest, ', reached at time ', time, '.')
                 dests_num += 1
                 prev = dest
 
@@ -144,4 +149,3 @@ class VRPSolution:
             print('    Total cost of vehicle : ', cost)
 
             vehicle_num += 1
-

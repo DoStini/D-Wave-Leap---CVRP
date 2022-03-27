@@ -1,9 +1,12 @@
+from asyncio import sleep
 import networkx as nx
 import csv
 import math
 from utilities import *
 from itertools import product
 import numpy as np
+import time as Time
+import matplotlib.pyplot as plt
 
 # format:
 # nodes.csv: id|enu_east|enu_north|enu_up|lla_longitude|lla_latitude|lla_altitude
@@ -15,12 +18,12 @@ TIME_WINDOWS_DIFF = 1
 TIME_WINDOWS_RADIUS = 60
 DIST_TO_TIME = float(1) / float(444)
 
+
 def create_graph_from_csv(path):
     g = nx.DiGraph(directed=True)
 
     with open(path+"/vertex_weigths.csv", mode='r') as e_infile:
         reader = csv.reader(e_infile)
-        next(reader)
         for row in reader:
             id1 = int(row[0])
             id2 = int(row[1])
@@ -30,10 +33,11 @@ def create_graph_from_csv(path):
 
     return g
 
-def read_full_test(path, graph_path = GRAPH_PATH):
+
+def read_full_test(path, graph_path=GRAPH_PATH):
     graph = create_graph_from_csv(graph_path)
     in_file = open(path, 'r')
-    
+
     # Smaller id's of sources and orders.
     nodes_id = list()
 
@@ -42,7 +46,7 @@ def read_full_test(path, graph_path = GRAPH_PATH):
     nodes_id = [int(s) for s in in_file.readline().split() if s.isdigit()]
     magazines_num = len(nodes_id)
 
-    # Reading destinations, time_windows and weights. 
+    # Reading destinations, time_windows and weights.
     next(in_file)
     dests_num = int(in_file.readline())
     nodes_num = dests_num + magazines_num
@@ -50,11 +54,16 @@ def read_full_test(path, graph_path = GRAPH_PATH):
     time_windows = np.zeros((nodes_num), dtype=int)
     weights = np.zeros((nodes_num), dtype=int)
 
+    dests_ids = []
+    sources_ids = nodes_id.copy()
+
     for i in range(dests_num):
         order = in_file.readline().split()
-        
+
         dest = int(order[0])
-        time_window = int(floor_to_value(float(order[1]), float(TIME_WINDOWS_DIFF)) + float(TIME_WINDOWS_RADIUS))
+        dests_ids.append(dest)
+        time_window = int(floor_to_value(float(order[1]), float(
+            TIME_WINDOWS_DIFF)) + float(TIME_WINDOWS_RADIUS))
         weight = int(order[3])
 
         nodes_id.append(dest)
@@ -62,12 +71,13 @@ def read_full_test(path, graph_path = GRAPH_PATH):
         weights[i + magazines_num] = weight
 
     next(in_file)
-    vehicles = int(in_file.readline())
+    curr = in_file.readline()
+    vehicles = int(curr)
     capacities = np.zeros((vehicles), dtype=int)
 
     for i in range(vehicles):
         line = in_file.readline().split()
-        capacities[i] = int(line[1])
+        capacities[i] = int(line[0])
 
     # Creating costs and time_costs matrix.
     costs = np.zeros((nodes_num, nodes_num), dtype=float)
@@ -75,11 +85,15 @@ def read_full_test(path, graph_path = GRAPH_PATH):
 
     for i in range(nodes_num):
         source = nodes_id[i]
-        _, paths = nx.single_source_dijkstra(graph, source, weight = 'distance')
+        _, paths = nx.single_source_dijkstra(graph, source, weight='distance')
         for j in range(nodes_num):
             d = nodes_id[j]
+            if (d not in paths):
+                costs[i][j] = math.inf
+                time_costs[i][j] = math.inf
+                continue
             path = paths[d]
-        
+
             prev = source
             for node in path[1:]:
                 edge = graph.get_edge_data(prev, node)
@@ -89,23 +103,28 @@ def read_full_test(path, graph_path = GRAPH_PATH):
 
     result = dict()
     result['sources'] = [i for i in range(magazines_num)]
-    result['dests'] =  [i for i in range(magazines_num, nodes_num)]
+    result['dests'] = [i for i in range(magazines_num, nodes_num)]
+    result['sources_nodes'] = sources_ids
+    result['dests_node'] = dests_ids
+    result['relevant_nodes'] = nodes_id
     result['costs'] = costs
     result['time_costs'] = time_costs
     result['weights'] = weights
     result['time_windows'] = time_windows
     result['capacities'] = capacities
+    result['graph'] = graph
 
     in_file.close()
     return result
 
+
 def read_test(path):
     in_file = open(path, 'r')
-    
+
     # Number of magazines.
     magazines_num = int(in_file.readline())
 
-    # Number of destinations. 
+    # Number of destinations.
     dests_num = int(in_file.readline())
 
     nodes_num = magazines_num + dests_num
@@ -115,7 +134,7 @@ def read_test(path):
 
     for i in range(dests_num):
         order = in_file.readline().split()
-        
+
         weight = int(order[0])
         time_window = float(order[1]) + float(TIME_WINDOWS_RADIUS)
 
@@ -140,7 +159,7 @@ def read_test(path):
 
     result = dict()
     result['sources'] = [i for i in range(magazines_num)]
-    result['dests'] =  [i for i in range(magazines_num, nodes_num)]
+    result['dests'] = [i for i in range(magazines_num, nodes_num)]
     result['costs'] = costs
     result['time_costs'] = time_costs
     result['weights'] = weights
@@ -149,6 +168,7 @@ def read_test(path):
 
     in_file.close()
     return result
+
 
 def create_test(in_path, out_path):
     test = read_full_test(in_path)
@@ -163,7 +183,7 @@ def create_test(in_path, out_path):
     # Number of destinations lines. Weights, start and edn of time window.
     for dest in test['dests']:
         out_file.write(str(test['weights'][dest]) + ' ' + str(test['time_windows'][dest] - TIME_WINDOWS_RADIUS)
-                + ' ' + str(test['time_windows'][dest] + TIME_WINDOWS_RADIUS) + '\n')
+                       + ' ' + str(test['time_windows'][dest] + TIME_WINDOWS_RADIUS) + '\n')
 
     n = len(test['sources']) + len(test['dests'])
     costs = test['costs']
