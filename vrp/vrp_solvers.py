@@ -1,5 +1,5 @@
 from qubo_helper import Qubo
-from tsp_problem import TSPProblem 
+from tsp_problem import TSPProblem
 from vrp_problem import VRPProblem
 from vrp_solution import VRPSolution
 from itertools import product
@@ -7,8 +7,11 @@ import DWaveSolvers
 import networkx as nx
 import numpy as np
 from queue import Queue
+import dwave.inspector
 
 # Attributes : VRPProblem
+
+
 class VRPSolver:
     def __init__(self, problem):
         self.problem = problem
@@ -17,52 +20,63 @@ class VRPSolver:
         self.problem = problem
 
     def solve(self, only_one_const, order_const, capacity_const,
-            solver_type = 'qbsolv', num_reads = 50):
+              solver_type='qbsolv', num_reads=50):
         pass
+
 
 class FullQuboSolver(VRPSolver):
     def solve(self, only_one_const, order_const, capacity_const,
-            solver_type = 'qbsolv', num_reads = 50):
+              solver_type='qbsolv', num_reads=50):
         dests = len(self.problem.dests)
         vehicles = len(self.problem.capacities)
 
         limits = [dests for _ in range(vehicles)]
 
-        vrp_qubo = self.problem.get_qubo_with_limits(limits, only_one_const, order_const, capacity_const)
-        samples = DWaveSolvers.solve_qubo(vrp_qubo, solver_type = solver_type, num_reads = num_reads)
+        print("Preparing qubo")
+
+        vrp_qubo = self.problem.get_qubo_with_limits(
+            limits, only_one_const, order_const, capacity_const)
+
+        print("VRP Qubo")
+
+        samples = DWaveSolvers.solve_qubo(
+            vrp_qubo, solver_type=solver_type, num_reads=num_reads)
         sample = samples[0]
         solution = VRPSolution(self.problem, sample, limits)
         return solution
 
+
 class AveragePartitionSolver(VRPSolver):
     def solve(self, only_one_const, order_const, capacity_const,
-            solver_type = 'qbsolv', num_reads = 50, limit_radius = 1):
+              solver_type='qbsolv', num_reads=50, limit_radius=1):
         dests = len(self.problem.dests)
         vehicles = len(self.problem.capacities)
 
         avg = int(dests / vehicles)
 
-        limits = [(max(avg - limit_radius, 0), min(avg + limit_radius, dests)) for _ in range(vehicles)]
+        limits = [(max(avg - limit_radius, 0), min(avg + limit_radius, dests))
+                  for _ in range(vehicles)]
         max_limits = [r for (_, r) in limits]
 
         vrp_qubo = self.problem.get_qubo_with_both_limits(limits,
-                only_one_const, order_const, capacity_const)
+                                                          only_one_const, order_const, capacity_const)
 
-        samples = DWaveSolvers.solve_qubo(vrp_qubo, solver_type = solver_type, num_reads = num_reads)
+        samples = DWaveSolvers.solve_qubo(
+            vrp_qubo, solver_type=solver_type, num_reads=num_reads)
         sample = samples[0]
 
         solution = VRPSolution(self.problem, sample, max_limits)
         return solution
 
+
 class DBScanSolver(VRPSolver):
 
-    MAX_DIST = 100000000.
-    MAX_LEN = 10
-    MAX_WEIGHT = 1000
-
-    def __init__(self, problem, anti_noiser = True):
+    def __init__(self, problem, anti_noiser=True, MAX_LEN=10, MAX_DIST=100000000., MAX_WEIGHT=1000):
         self.problem = problem
         self.anti_noiser = anti_noiser
+        self.MAX_LEN = MAX_LEN
+        self.MAX_DIST = MAX_DIST
+        self.MAX_WEIGTH = MAX_WEIGHT
 
     def _range_query(self, dests, costs, source, radius):
         result = list()
@@ -100,7 +114,7 @@ class DBScanSolver(VRPSolver):
                     if states[v] == -2:
                         q.put(v)
 
-        for dest in dests: 
+        for dest in dests:
             if states[dest] == -1:
                 min_dist = self.MAX_DIST
                 best_neighbour = -1
@@ -196,7 +210,7 @@ class DBScanSolver(VRPSolver):
         return best_res
 
     def solve(self, only_one_const, order_const, capacity_const,
-            solver_type = 'qbsolv', num_reads = 50):
+              solver_type='qbsolv', num_reads=50):
         problem = self.problem
         dests = problem.dests
         costs = problem.costs
@@ -211,21 +225,29 @@ class DBScanSolver(VRPSolver):
             return VRPSolution(problem, None, None, [[]])
 
         # Some idea
-        #if len(dests) <= self.MAX_LEN:
+        # if len(dests) <= self.MAX_LEN:
         #    solver = AveragePartitionSolver(problem)
         #    result = solver.solve(only_one_const, order_const, capacity_const,
         #                        solver_type = solver_type, num_reads = num_reads).solution
         #    return VRPSolution(problem, None, None, result)
 
-        clusters = self._recursive_dbscan(dests, costs, 0., self.MAX_DIST, vehicles, self.MAX_LEN, 1000)
+        clusters = self._recursive_dbscan(
+            dests, costs, 0., self.MAX_DIST, vehicles, self.MAX_LEN, 1000)
+
+        print("dests", dests)
+        print("niodes", problem.relevant_nodes)
+        print("cluster", clusters)
 
         if len(clusters) == vehicles:
             result = list()
             for cluster in clusters:
-                new_problem = VRPProblem(sources, costs, time_costs, [capacities[0]], cluster, weights)
+                new_problem = VRPProblem(sources, costs, time_costs, [
+                                         capacities[0]], cluster, weights, problem.relevant_nodes, problem.first_source)
+                print("new problem", new_problem.relevant_nodes,
+                      problem.relevant_nodes)
                 solver = FullQuboSolver(new_problem)
                 solution = solver.solve(only_one_const, order_const, capacity_const,
-                                    solver_type = solver_type, num_reads = num_reads).solution[0]
+                                        solver_type=solver_type, num_reads=num_reads).solution[0]
                 result.append(solution)
             return VRPSolution(problem, None, None, result)
 
@@ -234,10 +256,10 @@ class DBScanSolver(VRPSolver):
 
         for cluster in clusters:
             new_problem = VRPProblem(sources, costs, time_costs, [capacities[0]], cluster, weights,
-                                 first_source = False, last_source = False)
+                                     problem.relevant_nodes, first_source=False, last_source=False)
             solver = FullQuboSolver(new_problem)
             solution = solver.solve(only_one_const, order_const, capacity_const,
-                                    solver_type = solver_type, num_reads = num_reads)
+                                    solver_type=solver_type, num_reads=num_reads)
             solutions.append(solution)
 
         clusters_num = len(clusters) + 1
@@ -254,16 +276,18 @@ class DBScanSolver(VRPSolver):
             id1 = solutions[i].solution[0][-1]
             id2 = solutions[j].solution[0][0]
             new_costs[i][j] = costs[id1][id2]
-            new_time_costs[i][j] = solutions[j].all_time_costs()[0] + time_costs[id1][id2]
+            new_time_costs[i][j] = solutions[j].all_time_costs()[
+                0] + time_costs[id1][id2]
 
         for i in range(clusters_num):
             for dest in solutions[i].solution[0]:
                 new_weights[i] += weights[dest]
 
-        new_problem = VRPProblem(sources, new_costs, new_time_costs, capacities, new_dests, new_weights)
+        new_problem = VRPProblem(
+            sources, new_costs, new_time_costs, capacities, new_dests, new_weights, problem.relevant_nodes)
         solver = DBScanSolver(new_problem)
-        compressed_solution = solver.solve(only_one_const, order_const, capacity_const, 
-                            solver_type = solver_type, num_reads = num_reads).solution
+        compressed_solution = solver.solve(only_one_const, order_const, capacity_const,
+                                           solver_type=solver_type, num_reads=num_reads).solution
 
         uncompressed_solution = list()
         for vehicle_dests in compressed_solution:
@@ -274,18 +298,18 @@ class DBScanSolver(VRPSolver):
 
         return VRPSolution(problem, None, None, uncompressed_solution)
 
+
 class SolutionPartitioningSolver(VRPSolver):
 
-    INF = 1000000000
-
-    def __init__(self, problem, solver, time_limits = None):
+    def __init__(self, problem, solver, time_limits=None, INF=1000000000):
         self.problem = problem
         self.solver = solver
         self.time_limits = time_limits
+        self.INF = INF
         if time_limits == None:
             size = len(problem.capacities)
             self.time_limits = [self.INF for _ in range(size)]
-    
+
     def _divide_solution_greedy(self, solution):
         solution = solution[1:-1]
         problem = self.problem
@@ -349,7 +373,8 @@ class SolutionPartitioningSolver(VRPSolver):
                         prev_state[i][j] = pointer
                     cap -= weights[solution[pointer + 1]]
                     if pointer != i - 1:
-                        time -= time_costs[solution[pointer + 1]][solution[pointer + 2]]
+                        time -= time_costs[solution[pointer + 1]
+                                           ][solution[pointer + 2]]
 
         new_solution = []
         pointer = dests - 1
@@ -365,11 +390,11 @@ class SolutionPartitioningSolver(VRPSolver):
             else:
                 new_solution.append([])
             pointer = prev
-        
+
         new_solution.reverse()
         return VRPSolution(problem, None, None, new_solution)
 
-    def _divide_solution_random(self, solution, random = 100):
+    def _divide_solution_random(self, solution, random=100):
         capacities = self.problem.capacities.copy()
         vehicles = len(capacities)
 
@@ -394,7 +419,7 @@ class SolutionPartitioningSolver(VRPSolver):
         return new_solution
 
     def solve(self, only_one_const, order_const, capacity_const,
-            solver_type = 'qbsolv', num_reads = 50):
+              solver_type='qbsolv', num_reads=50):
         problem = self.problem
         capacity = 0
         weights = problem.weights
@@ -407,7 +432,8 @@ class SolutionPartitioningSolver(VRPSolver):
         costs = problem.costs
         time_costs = problem.time_costs
         new_capacities = [capacity]
-        new_problem = VRPProblem(sources, costs, time_costs, new_capacities, dests, weights)
+        new_problem = VRPProblem(
+            sources, costs, time_costs, new_capacities, dests, weights)
 
         if len(dests) == 0:
             sol = [[] for _ in range(len(problem.capacities))]
@@ -416,7 +442,7 @@ class SolutionPartitioningSolver(VRPSolver):
         solver = self.solver
         solver.set_problem(new_problem)
         solution = solver.solve(only_one_const, order_const, capacity_const,
-            solver_type = solver_type, num_reads = num_reads)
+                                solver_type=solver_type, num_reads=num_reads)
 
         sol = solution.solution[0]
         return self._divide_solution_random(sol)

@@ -1,12 +1,13 @@
 from dwave.system.samplers import DWaveSampler
 from dwave.system.composites import EmbeddingComposite
 from dwave_qbsolv import QBSolv
+from dwave import inspector
 from hybrid.reference.kerberos import KerberosSampler
 from dimod.reference.samplers import ExactSolver
 import hybrid
 import dimod
 import neal
-
+from dwave.inspector.adapters import enable_data_capture
 # Creates hybrid solver.
 
 
@@ -42,6 +43,9 @@ def solve_qubo(qubo, solver_type='qbsolv', limit=1, num_reads=50):
     sampler = get_solver(solver_type)
 
     response = None
+
+    enable_data_capture()
+
     if solver_type == 'hybrid':
         response = sampler.sample_qubo(qubo.dict)
     elif solver_type == 'qbsolv':
@@ -53,4 +57,8 @@ def solve_qubo(qubo, solver_type='qbsolv', limit=1, num_reads=50):
         response = sampler.sample_qubo(qubo.dict)
     else:
         response = sampler.sample_qubo(qubo.dict, num_reads=num_reads)
+
+    print(response)
+    # inspector.show(response)
+
     return list(response)[:limit]

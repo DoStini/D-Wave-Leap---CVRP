@@ -1,4 +1,5 @@
 from cProfile import label
+from typing import List
 from qubo_helper import Qubo
 from tsp_problem import TSPProblem
 from vrp_problem import VRPProblem
@@ -11,15 +12,28 @@ import networkx as nx
 import numpy as np
 from input import *
 import matplotlib.pyplot as plt
+from colour import Color
 
 CAPACITY = 1000
 
 
-def draw_graph(g):
-    labels = nx.get_edge_attributes(g, 'distance')
-    pos = nx.spring_layout(g)
-    nx.draw(g, pos, with_labels=True)
-    nx.draw_networkx_edge_labels(g, pos=pos, edge_labels=labels)
+def draw_graph(g: nx.digraph.DiGraph, solution):
+    pos = nx.spring_layout(g, seed=1)
+    options = {"edgecolors": "tab:gray",
+               "node_size": 200, "alpha": 1}
+
+    red = Color("red")
+    colors: List[Color] = list(red.range_to(Color("blue"), len(solution)))
+
+    nx.draw_networkx_nodes(g, pos, **options)
+    nx.draw_networkx_labels(g, pos)
+
+    for idx, sol in enumerate(solution):
+        color = colors[idx].hex
+        edge_list = [(sol[x-1], sol[x]) for x in range(1, len(sol))]
+        nx.draw_networkx_edges(g, pos, width=1, alpha=0.5,
+                               arrows=False, edge_color=color, edgelist=edge_list)
+
     plt.show()
 
 
@@ -61,8 +75,8 @@ if __name__ == '__main__':
     # test = read_test(TEST)
 
     # Christofides_79
-    GRAPH = "./tests/test1"
-    TEST = "./tests/test1/example_scenario"
+    GRAPH = "tests/test6"
+    TEST = "tests/test6/problem"
     test = read_full_test(TEST, GRAPH)
 
     # Christofides_69
@@ -81,6 +95,7 @@ if __name__ == '__main__':
     dests = test['dests']
     weigths = test['weights']
     time_windows = test['time_windows']
+    print("nodes_id-rel_nodes-dests", nodes_id, relevant_nodes, dests)
 
     only_one_const = 10000000.
     order_const = 1.
@@ -92,14 +107,18 @@ if __name__ == '__main__':
     # solver = SolutionPartitioningSolver(
     #     problem, DBScanSolver(problem, anti_noiser=False, MAX_LEN=10))
 
-    solver = FullQuboSolver(problem)
+    solver = DBScanSolver(problem)
 
     # problem = VRPTWProblem(sources, costs, time_costs, capacities, dests, weigths, time_windows)
     # vrp_solver = SolutionPartitioningSolver(problem, DBScanSolver(problem, anti_noiser = False))
     # solver = MergingTimeWindowsVRPTWSolver(problem, vrp_solver)
 
+    print("Preparing solver...")
+
     result = solver.solve(only_one_const, order_const, capacity_const,
                           solver_type='qbsolv', num_reads=500)
+
+    print("Solved...")
 
     if result == None:
         print("No results found\n")
@@ -120,4 +139,4 @@ if __name__ == '__main__':
 
     print("\n")
 
-    draw_graph(test['graph'])
+    draw_graph(test['graph'], result.human_solution)

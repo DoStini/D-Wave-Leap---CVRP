@@ -1,6 +1,8 @@
 from itertools import product
 
 # Simple class helping creating qubo dict.
+
+
 class Qubo:
     def __init__(self):
         self.dict = dict()
@@ -37,6 +39,9 @@ class Qubo:
         for field in self.dict:
             self.dict[field] *= const1
         for field in qubo.dict:
+            if (field == ((19, 1), (19, 1))):
+                print(self.dict[field], qubo.dict[field], const2,
+                      self.dict[field] + qubo.dict[field] * const2)
             self.create_not_exist_field(field)
             self.dict[field] += qubo.dict[field] * const2
         #self.satisfied_energy += qubo.satisfied_energy

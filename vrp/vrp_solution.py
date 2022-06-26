@@ -1,6 +1,11 @@
+from numpy import ndarray
+
+
 class VRPSolution:
     def __init__(self, problem, sample, vehicle_limits, solution=None):
         self.problem = problem
+
+        print("sample", sample)
 
         if solution != None:
             self.solution = solution
@@ -27,15 +32,16 @@ class VRPSolution:
             # Adding first and last magazine.
             for l in result:
                 if len(l) != 0:
-                    if problem.first_source.size:
+                    if type(problem.first_source) == ndarray and problem.first_source.size or problem.first_source == True:
                         l.insert(0, problem.in_nearest_sources[l[0]])
                     if problem.last_source:
                         l.append(problem.out_nearest_sources[l[len(l) - 1]])
 
             self.solution = result
-            human_nodes = self.problem.relevant_nodes
-            self.human_solution = [[human_nodes[x]
-                                    for x in vehicle] for vehicle in result]
+        human_nodes = self.problem.relevant_nodes
+        print(self.problem.relevant_nodes, self.solution)
+        self.human_solution = [[human_nodes[x]
+                                for x in vehicle] for vehicle in self.solution]
 
     # Checks capacity and visiting.
     def check(self):
