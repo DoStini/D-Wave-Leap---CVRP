@@ -433,7 +433,7 @@ class SolutionPartitioningSolver(VRPSolver):
         time_costs = problem.time_costs
         new_capacities = [capacity]
         new_problem = VRPProblem(
-            sources, costs, time_costs, new_capacities, dests, weights)
+            sources, costs, time_costs, new_capacities, dests, weights, problem.relevant_nodes)
 
         if len(dests) == 0:
             sol = [[] for _ in range(len(problem.capacities))]

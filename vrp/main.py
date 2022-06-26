@@ -107,10 +107,11 @@ if __name__ == '__main__':
     # solver = SolutionPartitioningSolver(
     #     problem, DBScanSolver(problem, anti_noiser=False, MAX_LEN=10))
 
-    solver = DBScanSolver(problem)
+    # solver = DBScanSolver(problem)
 
     # problem = VRPTWProblem(sources, costs, time_costs, capacities, dests, weigths, time_windows)
-    # vrp_solver = SolutionPartitioningSolver(problem, DBScanSolver(problem, anti_noiser = False))
+    solver = SolutionPartitioningSolver(
+        problem, DBScanSolver(problem, anti_noiser=False))
     # solver = MergingTimeWindowsVRPTWSolver(problem, vrp_solver)
 
     print("Preparing solver...")
